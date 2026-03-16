@@ -12,7 +12,6 @@ class UserActivity(models.Model):
         ('Distracted', 'Distracted'),
         ('Doomscrolling', 'Doomscrolling'),
         ('Neutral', 'Neutral'),
-<<<<<<< HEAD
         ('High Dopamine Risk', 'High Dopamine Risk'),
         ('Deep Focus Session', 'Deep Focus Session'),
         ('DOPAMINE SPIKE DETECTED', 'DOPAMINE SPIKE DETECTED'),
@@ -20,12 +19,6 @@ class UserActivity(models.Model):
 
     status = models.CharField(
         max_length=100,
-=======
-    ]
-
-    status = models.CharField(
-        max_length=20,
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
         choices=STATUS_CHOICES,
         default='Neutral'
     )

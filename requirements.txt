@@ -6,18 +6,12 @@ packaging==25.0
 psutil==5.9.5
 psycopg2-binary==2.9.11
 pynput==1.7.6
-<<<<<<< HEAD
 pywin32==311
-=======
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 six==1.17.0
 sqlparse==0.5.3
 tzdata==2025.2
 whitenoise==6.11.0
-<<<<<<< HEAD
 seaborn==0.13.2
 pandas==2.2.3
 matplotlib==3.9.2
 reportlab==4.2.5
-=======
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52

@@ -10,12 +10,9 @@ SECRET_KEY = '6af281df1a5aff3eee8b0d9bd1b9b979'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-<<<<<<< HEAD
-=======
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [ BASE_DIR / "static" ]
 
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 ALLOWED_HOSTS = ['*']
 
 # Application definition
@@ -87,16 +84,11 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # Internationalization
 LANGUAGE_CODE = 'en-us'
-<<<<<<< HEAD
 TIME_ZONE = 'Asia/Kolkata'
-=======
-TIME_ZONE = 'UTC'
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 USE_I18N = True
 USE_TZ = True
 
 # Static files (CSS, JavaScript, Images)
-<<<<<<< HEAD
 STATIC_URL = '/static/'
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
@@ -106,15 +98,3 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Whitenoise configuration
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-=======
-STATIC_URL = 'static/'
-
-# Default primary key field type
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / "static"]
->>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
