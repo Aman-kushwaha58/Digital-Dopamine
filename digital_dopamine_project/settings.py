@@ -5,18 +5,16 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '6af281df1a5aff3eee8b0d9bd1b9b979'
+SECRET_KEY = os.environ.get('SECRET_KEY', '6af281df1a5aff3eee8b0d9bd1b9b979')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [ BASE_DIR / "static" ]
-
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*'] # In production, replace with your Render URL
 
 # Application definition
 INSTALLED_APPS = [
+    'whitenoise.runserver_nostatic',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -59,11 +57,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'digital_dopamine_project.wsgi.application'
 
 # Database
+# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600
+    )
 }
 
 # Password validation

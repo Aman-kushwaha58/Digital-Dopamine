@@ -3,7 +3,12 @@ import time
 import threading
 import psutil
 from datetime import datetime
-from pynput import keyboard, mouse
+try:
+    from pynput import keyboard, mouse
+except:
+    keyboard = None
+    mouse = None
+
 from django.utils import timezone
 from .models import UserActivity
 
@@ -166,11 +171,20 @@ class DataCollector:
     
     def collect_data(self):
         """Main data collection loop"""
-        keyboard_listener = keyboard.Listener(on_press=self.on_press)
-        keyboard_listener.start()
-        
-        mouse_listener = mouse.Listener(on_scroll=self.on_scroll)
-        mouse_listener.start()
+
+        if keyboard:
+            try:
+                keyboard_listener = keyboard.Listener(on_press=self.on_press)
+                keyboard_listener.start()
+            except Exception as e:
+                print(f"Keyboard listener failed to start: {e}")
+
+        if mouse:
+            try:
+                mouse_listener = mouse.Listener(on_scroll=self.on_scroll)
+                mouse_listener.start()
+            except Exception as e:
+                print(f"Mouse listener failed to start: {e}")
         
         self.is_collecting = True
         
