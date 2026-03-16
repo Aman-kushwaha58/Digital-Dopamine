@@ -1,4 +1,5 @@
 # tracker/views.py
+<<<<<<< HEAD
 import datetime
 import io
 import csv
@@ -25,6 +26,12 @@ def get_collector():
     if _collector_instance is None:
         _collector_instance = DataCollector()
     return _collector_instance
+=======
+from django.shortcuts import render
+from django.http import JsonResponse
+from .models import UserActivity
+from django.views.decorators.csrf import csrf_exempt
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 
 def dashboard(request):
     """Main dashboard view"""
@@ -33,14 +40,22 @@ def dashboard(request):
 def get_recent_activity(request):
     """API endpoint to get recent activity data"""
     activities = UserActivity.objects.all().order_by('-timestamp')[:50]
+<<<<<<< HEAD
     collector = get_collector()
+=======
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 
     data = {
         'activities': [
             {
+<<<<<<< HEAD
                 'timestamp': timezone.localtime(activity.timestamp).strftime('%H:%M:%S'),
                 'app': activity.active_app,
                 'category': get_category(activity.active_app),
+=======
+                'timestamp': activity.timestamp.strftime('%H:%M:%S'),
+                'app': activity.active_app,
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
                 'typing_speed': activity.typing_speed,
                 'app_switches': activity.app_switch_count,
                 'dopamine_score': activity.dopamine_score,
@@ -49,7 +64,11 @@ def get_recent_activity(request):
             for activity in activities
         ],
         'total_records': UserActivity.objects.count(),
+<<<<<<< HEAD
         'current_app': collector.current_app if collector else "Unknown"
+=======
+        'current_app': "Unknown"
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
     }
 
     return JsonResponse(data)
@@ -57,6 +76,7 @@ def get_recent_activity(request):
 @csrf_exempt
 def start_tracking(request):
     """API endpoint to start data collection"""
+<<<<<<< HEAD
     collector = get_collector()
     if not collector.is_collecting:
         collector.start_collection()
@@ -67,11 +87,22 @@ def start_tracking(request):
     return JsonResponse({
         'status': 'started',
         'message': message
+=======
+    from .data_collector import DataCollector  # ✅ import INSIDE function
+
+    collector = DataCollector()
+    collector.start_collection()
+
+    return JsonResponse({
+        'status': 'started',
+        'message': 'Data collection started'
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
     })
 
 @csrf_exempt
 def stop_tracking(request):
     """API endpoint to stop data collection"""
+<<<<<<< HEAD
     collector = get_collector()
     if collector.is_collecting:
         collector.stop_collection()
@@ -82,10 +113,17 @@ def stop_tracking(request):
     return JsonResponse({
         'status': 'stopped',
         'message': message
+=======
+    # (Later you can manage shared state, for now keep simple)
+    return JsonResponse({
+        'status': 'stopped',
+        'message': 'Data collection stopped'
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
     })
 
 def statistics(request):
     """Get overall statistics"""
+<<<<<<< HEAD
     today = timezone.now().date()
     activities = UserActivity.objects.all()
     today_activities = activities.filter(timestamp__date=today)
@@ -169,12 +207,25 @@ def statistics(request):
         recent_dopamine = today_activities.order_by('-timestamp')[:50]
         dopamine_timeline = [timezone.localtime(a.timestamp).strftime('%H:%M:%S') for a in reversed(recent_dopamine)]
         dopamine_scores = [a.dopamine_score for a in reversed(recent_dopamine)]
+=======
+    activities = UserActivity.objects.all()
+
+    if activities.exists():
+        total = activities.count()
+        focused = activities.filter(status='Focused').count()
+        distracted = activities.filter(status='Distracted').count()
+        doomscrolling = activities.filter(status='Doomscrolling').count()
+
+        avg_dopamine = sum(a.dopamine_score for a in activities) / total
+        avg_typing_speed = sum(a.typing_speed for a in activities) / total
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 
         stats = {
             'total_sessions': total,
             'focused_percentage': (focused / total) * 100,
             'distracted_percentage': (distracted / total) * 100,
             'doomscrolling_percentage': (doomscrolling / total) * 100,
+<<<<<<< HEAD
             'high_risk_percentage': (high_risk / total) * 100,
             'deep_work_sessions': deep_focus,
             'todays_dopamine_spikes': todays_spikes,
@@ -199,6 +250,11 @@ def statistics(request):
             },
             'distraction_alert': distraction_alert,
             'top_apps': top_apps_list
+=======
+            'avg_dopamine_score': round(avg_dopamine, 2),
+            'avg_typing_speed': round(avg_typing_speed, 2),
+            'top_apps': get_top_apps()
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
         }
     else:
         stats = {
@@ -206,6 +262,7 @@ def statistics(request):
             'focused_percentage': 0,
             'distracted_percentage': 0,
             'doomscrolling_percentage': 0,
+<<<<<<< HEAD
             'high_risk_percentage': 0,
             'deep_work_sessions': 0,
             'todays_dopamine_spikes': 0,
@@ -229,18 +286,27 @@ def statistics(request):
                 'doomscroll_peak': 'N/A'
             },
             'distraction_alert': False,
+=======
+            'avg_dopamine_score': 0,
+            'avg_typing_speed': 0,
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             'top_apps': []
         }
 
     return JsonResponse(stats)
 
 def get_top_apps():
+<<<<<<< HEAD
+=======
+    from django.db.models import Count
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
     return list(
         UserActivity.objects
         .values('active_app')
         .annotate(count=Count('active_app'))
         .order_by('-count')[:5]
     )
+<<<<<<< HEAD
 
 def get_category(app_name):
     APP_CATEGORIES = {
@@ -343,3 +409,5 @@ def export_pdf(request):
 
     c_renderer.save()
     return response
+=======
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52

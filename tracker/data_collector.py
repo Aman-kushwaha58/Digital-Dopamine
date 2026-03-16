@@ -1,4 +1,5 @@
 # tracker/data_collector.py
+<<<<<<< HEAD
 import time
 import threading
 import psutil
@@ -13,6 +14,14 @@ try:
 except ImportError:
     win32gui = None
     win32process = None
+=======
+from .models import UserActivity
+import psutil
+import time
+import threading
+from datetime import datetime
+from pynput import keyboard
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
 
 class DataCollector:
     def __init__(self):
@@ -23,6 +32,7 @@ class DataCollector:
         self.app_switches = 0
         self.previous_app = ""
         self.is_collecting = False
+<<<<<<< HEAD
         self.scroll_count = 0
         self.night_usage_time = 0
         self.consecutive_focus = 0
@@ -49,10 +59,13 @@ class DataCollector:
             "explorer": "neutral",
             "terminal": "neutral"
         }
+=======
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
         
     def get_active_app(self):
         """Get currently active application (Windows)"""
         try:
+<<<<<<< HEAD
             if not win32gui or not win32process:
                 return "Unknown (Install pywin32)"
             
@@ -72,10 +85,32 @@ class DataCollector:
                 process_name = process.name()
             except Exception:
                 process_name = "Unknown"
+=======
+            import win32gui
+            import win32process
+            import psutil
+            
+            def get_window_title(hwnd):
+                return win32gui.GetWindowText(hwnd)
+            
+            def get_process_name(hwnd):
+                _, pid = win32process.GetWindowThreadProcessId(hwnd)
+                try:
+                    process = psutil.Process(pid)
+                    return process.name()
+                except:
+                    return "Unknown"
+            
+            # Get foreground window
+            hwnd = win32gui.GetForegroundWindow()
+            window_title = get_window_title(hwnd)
+            process_name = get_process_name(hwnd)
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             
             # Return meaningful app name
             if window_title:
                 # Extract app name from window title or process
+<<<<<<< HEAD
                 title_lower = window_title.lower()
                 if "youtube" in title_lower:
                     return "YouTube"
@@ -88,6 +123,9 @@ class DataCollector:
                 elif "facebook" in title_lower:
                     return "Facebook"
                 elif "chrome" in process_name.lower() or "msedge" in process_name.lower():
+=======
+                if "chrome" in process_name.lower() or "msedge" in process_name.lower():
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
                     return "Browser"
                 elif "notepad" in process_name.lower():
                     return "Notepad"
@@ -118,6 +156,7 @@ class DataCollector:
     def on_press(self, key):
         """Count keystrokes for typing speed calculation"""
         self.keystroke_count += 1
+<<<<<<< HEAD
 
     def on_scroll(self, x, y, dx, dy):
         """Count mouse scrolls"""
@@ -128,6 +167,8 @@ class DataCollector:
             if key in app_name.lower():
                 return category
         return "neutral"
+=======
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
     
     def calculate_typing_speed(self):
         """Calculate typing speed in keys per minute"""
@@ -140,6 +181,7 @@ class DataCollector:
             return int(speed)
         return 0
     
+<<<<<<< HEAD
     def detect_user_status(self, typing_speed, app_switches, scroll_count, is_night):
         """Simple rule-based status detection"""
         social_media = ["YouTube", "Instagram", "WhatsApp Web", "Reddit", "Facebook"]
@@ -148,6 +190,11 @@ class DataCollector:
         elif self.current_app in social_media and typing_speed == 0 and scroll_count > 10:
             return "Doomscrolling"
         elif app_switches > 5:
+=======
+    def detect_user_status(self, typing_speed, app_switches):
+        """Simple rule-based status detection"""
+        if app_switches > 5:
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             return "Distracted"
         elif typing_speed < 10 and self.current_app != "Unknown":
             return "Doomscrolling"
@@ -156,6 +203,7 @@ class DataCollector:
         else:
             return "Neutral"
     
+<<<<<<< HEAD
     def calculate_dopamine_score(self, typing_speed, app_switches, category):
         """Calculate simple dopamine score (0-100)"""
         base_score = min(typing_speed * 0.5 + app_switches * 10, 100)
@@ -163,6 +211,11 @@ class DataCollector:
             base_score += 20
         elif category == "productive":
             base_score = max(base_score - 10, 0)
+=======
+    def calculate_dopamine_score(self, typing_speed, app_switches):
+        """Calculate simple dopamine score (0-100)"""
+        base_score = min(typing_speed * 0.5 + app_switches * 10, 100)
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
         return int(min(max(base_score, 0), 100))
     
     def collect_data(self):
@@ -170,6 +223,7 @@ class DataCollector:
         keyboard_listener = keyboard.Listener(on_press=self.on_press)
         keyboard_listener.start()
         
+<<<<<<< HEAD
         mouse_listener = mouse.Listener(on_scroll=self.on_scroll)
         mouse_listener.start()
         
@@ -181,6 +235,11 @@ class DataCollector:
             hour = now.hour
             is_night = hour >= 23 or hour <= 2
             
+=======
+        self.is_collecting = True
+        
+        while self.is_collecting:
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             # Update current app
             new_app = self.get_active_app()
             
@@ -191,6 +250,7 @@ class DataCollector:
             self.current_app = new_app
             self.previous_app = new_app
             
+<<<<<<< HEAD
             # Accumulate night usage time
             if is_night:
                 self.night_usage_time += 5
@@ -214,6 +274,12 @@ class DataCollector:
             # Check for dopamine spike
             if self.app_switches > 5 and typing_speed < 5:
                 status = "DOPAMINE SPIKE DETECTED"
+=======
+            # Calculate metrics
+            typing_speed = self.calculate_typing_speed()
+            dopamine_score = self.calculate_dopamine_score(typing_speed, self.app_switches)
+            status = self.detect_user_status(typing_speed, self.app_switches)
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             
             # Save to database
             activity = UserActivity(
@@ -225,9 +291,14 @@ class DataCollector:
             )
             activity.save()
             
+<<<<<<< HEAD
             # Reset counters for next period
             self.app_switches = 0
             self.scroll_count = 0
+=======
+            # Reset app switches for next period
+            self.app_switches = 0
+>>>>>>> 175a2eeb2c9abb5453e1acd8e58d1893e0848a52
             
             # Wait 5 seconds before next collection
             time.sleep(5)
