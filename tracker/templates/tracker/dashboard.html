@@ -248,8 +248,9 @@
                 Current App: <span id="currentApp">Loading...</span>
             </div>
             <div id="syncIndicator" style="font-size: 11px; color: #888; margin-top: -15px; margin-bottom: 20px;">
-                <span style="display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; margin-right: 5px;"></span>
+                <span id="syncDot" style="display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; margin-right: 5px;"></span>
                 Last Sync: <span id="lastSync">Just now</span>
+                <button onclick="fetchData();" style="border: none; background: none; color: var(--primary); font-size: 10px; cursor: pointer; margin-left: 10px; text-decoration: underline;">Refresh Now</button>
             </div>
         </header>
 
@@ -377,16 +378,34 @@
         }
 
         async function fetchData() {
+            const syncDot = document.getElementById('syncDot');
+            const cacheBuster = `?t=${Date.now()}`;
+            
+            // 10-second timeout controller
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000);
+
             try {
                 const [statsRes, activityRes] = await Promise.all([
-                    fetch('/api/stats/'),
-                    fetch('/api/activity/')
+                    fetch('/api/stats/' + cacheBuster, { signal: controller.signal, cache: 'no-store' }),
+                    fetch('/api/activity/' + cacheBuster, { signal: controller.signal, cache: 'no-store' })
                 ]);
+                
+                clearTimeout(timeoutId);
+
+                if (!statsRes.ok || !activityRes.ok) throw new Error("Server responded with error");
+
                 const stats = await statsRes.json();
                 const activity = await activityRes.json();
                 updateUI(stats, activity);
+                
                 document.getElementById('lastSync').innerText = new Date().toLocaleTimeString();
-            } catch(e) { console.error(e); }
+                syncDot.style.background = '#4caf50'; // Green = OK
+            } catch(e) { 
+                console.error("Sync failed:", e);
+                syncDot.style.background = '#f44336'; // Red = Error
+                document.getElementById('lastSync').innerText = "Sync Failed (" + new Date().toLocaleTimeString() + ")";
+            }
         }
 
         function updateUI(stats, activity) {

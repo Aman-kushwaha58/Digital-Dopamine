@@ -27,10 +27,12 @@ def get_collector():
         _collector_instance = DataCollector()
     return _collector_instance
 
+@csrf_exempt
 def dashboard(request):
     """Main dashboard view"""
     return render(request, 'tracker/dashboard.html')
 
+@csrf_exempt
 def get_recent_activity(request):
     """API endpoint to get recent activity data"""
     activities = UserActivity.objects.all().order_by('-timestamp')[:50]
@@ -93,6 +95,7 @@ def clear_history(request):
         return JsonResponse({'status': 'success', 'message': 'History cleared'})
     return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
 
+@csrf_exempt
 def statistics(request):
     """Get overall statistics"""
     today = timezone.localtime(timezone.now()).date()
