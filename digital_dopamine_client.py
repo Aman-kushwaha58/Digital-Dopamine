@@ -20,12 +20,16 @@ class ActivityClient:
     def __init__(self):
         self.keystroke_count = 0
         self.start_time = time.time()
-        self.last_app = ""
+        self.last_detected_app = ""
         self.app_switches = 0
+        self.current_app = "Desktop"
+        self.lock = threading.Lock()
         
-    def get_active_app(self):
+    def get_active_app_raw(self):
         try:
             hwnd = win32gui.GetForegroundWindow()
+            if not hwnd: return "Desktop"
+            
             _, pid = win32process.GetWindowThreadProcessId(hwnd)
             process = psutil.Process(pid)
             process_name = process.name().replace('.exe', '').title()
@@ -35,79 +39,91 @@ class ActivityClient:
             if "youtube" in window_title: return "YouTube"
             if "instagram" in window_title: return "Instagram"
             if "whatsapp" in window_title: return "WhatsApp"
+            if "netflix" in window_title: return "Netflix"
             if "vlc" in process_name.lower(): return "VLC Media Player"
             if "chrome" in process_name.lower(): return "Google Chrome"
             if "msedge" in process_name.lower(): return "Microsoft Edge"
+            if "firefox" in process_name.lower(): return "Firefox"
             if "code" in process_name.lower(): return "VS Code"
+            if "discord" in process_name.lower(): return "Discord"
+            if "spotify" in process_name.lower(): return "Spotify"
             
             return process_name
         except:
             return "Desktop"
 
-    def on_press(self, key):
-        self.keystroke_count += 1
+    def app_monitor_loop(self):
+        """High-frequency thread to catch every single app switch"""
+        while True:
+            curr = self.get_active_app_raw()
+            with self.lock:
+                if curr != self.last_detected_app:
+                    if self.last_detected_app != "":
+                        self.app_switches += 1
+                    self.last_detected_app = curr
+                self.current_app = curr
+            time.sleep(0.5) # Check twice a second
 
-    def calculate_stats(self):
-        curr_app = self.get_active_app()
-        if curr_app != self.last_app and self.last_app != "":
-            self.app_switches += 1
-        
-        elapsed = time.time() - self.start_time
-        kpm = int((self.keystroke_count / elapsed) * 60) if elapsed > 0 else 0
-        
-        # Reset counters
-        self.keystroke_count = 0
-        self.start_time = time.time()
-        switches = self.app_switches
-        self.app_switches = 0
-        self.last_app = curr_app
-        
-        return {
-            "app": curr_app,
-            "typing_speed": kpm,
-            "switches": switches,
-            "timestamp": datetime.now().strftime("%H:%M:%S")
-        }
+    def on_press(self, key):
+        with self.lock:
+            self.keystroke_count += 1
+
+    def calculate_report_data(self):
+        with self.lock:
+            elapsed = time.time() - self.start_time
+            kpm = int((self.keystroke_count / elapsed) * 60) if elapsed > 0 else 0
+            
+            # Extract data for report
+            data = {
+                "app": self.current_app,
+                "typing_speed": kpm,
+                "switches": self.app_switches,
+                "timestamp": datetime.now().strftime("%H:%M:%S")
+            }
+            
+            # Reset interval counters
+            self.keystroke_count = 0
+            self.start_time = time.time()
+            self.app_switches = 0
+            
+            return data
 
     def run(self):
-        print(f"Digital Dopamine Client starting... Sending to {SERVER_URL}")
+        print(f"==========================================")
+        print(f"🚀 Digital Dopamine Live Tracker")
+        print(f"📡 Status: Sending to {SERVER_URL}")
+        print(f"==========================================")
         
-        # Start keyboard listener with robust error handling for Python 3.13 compatibility
+        # Start high-frequency app monitor thread
+        monitor_thread = threading.Thread(target=self.app_monitor_loop, daemon=True)
+        monitor_thread.start()
+        
+        # Start keyboard listener
         try:
             def on_press_wrapper(key):
-                try:
-                    self.on_press(key)
-                except:
-                    pass
+                try: self.on_press(key)
+                except: pass
             
             listener = keyboard.Listener(on_press=on_press_wrapper)
             listener.daemon = True
             listener.start()
+            print("⌨️  Keyboard tracking: ACTIVE")
         except Exception as e:
-            print(f"Keyboard tracking failed (Python 3.13 issue): {e}. Continuing with app tracking only.")
+            print(f"⚠️  Keyboard tracking: FAILED (Using app tracking only)")
         
         while True:
             try:
-                data = self.calculate_stats()
-                # Basic status rules
-                speed = int(data.get('typing_speed', 0))
-                switches = int(data.get('switches', 0))
+                data = self.calculate_report_data()
                 
-                if speed > 30: data['status'] = "Focused"
-                elif switches > 3: data['status'] = "Distracted"
-                else: data['status'] = "Neutral"
-                
-                # Simple dopamine score logic
-                raw_score = float(speed * 0.5 + switches * 15)
-                data['dopamine_score'] = int(min(100.0, raw_score))
+                # Basic terminal feedback
+                print(f"[{data['timestamp']}] Active: {data['app']} | Speed: {data['typing_speed']} KPM | Switches: {data['switches']}")
                 
                 response = requests.post(f"{SERVER_URL}/api/report/", json=data, timeout=5)
-                if response.status_code == 200:
-                    print(f"[{data['timestamp']}] Report successful: {data['app']} ({data['typing_speed']} KPM)")
-                else:
-                    print(f"Error: Server returned {response.status_code}")
+                if response.status_code != 200:
+                    print(f"❌ Server Error: {response.status_code}")
+                
             except Exception as e:
-                print(f"Connection failed: {e}")
+                print(f"🌐 Connection Error: {e}")
             
             time.sleep(7)
 

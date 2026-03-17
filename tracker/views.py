@@ -95,7 +95,7 @@ def clear_history(request):
 
 def statistics(request):
     """Get overall statistics"""
-    today = timezone.now().date()
+    today = timezone.localtime(timezone.now()).date()
     activities = UserActivity.objects.all()
     today_activities = activities.filter(timestamp__date=today)
 
@@ -270,8 +270,11 @@ def get_category(app_name):
         "explorer": "neutral",
         "terminal": "neutral"
     }
+    if not app_name:
+        return "neutral"
+    
     for key, category in APP_CATEGORIES.items():
-        if key in app_name.lower():
+        if key in str(app_name).lower():
             return category
     return "neutral"
 
