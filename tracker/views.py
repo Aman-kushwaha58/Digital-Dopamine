@@ -6,7 +6,7 @@ from datetime import timedelta
 from django.shortcuts import render
 from django.http import JsonResponse, HttpResponse
 from django.views.decorators.csrf import csrf_exempt
-from django.db.models import Count, Avg
+from django.db.models import Count, Avg, Sum
 from django.db.models.functions import ExtractWeekDay
 from django.utils import timezone
 from .models import UserActivity
@@ -49,7 +49,7 @@ def get_recent_activity(request):
             for activity in activities
         ],
         'total_records': UserActivity.objects.count(),
-        'current_app': collector.current_app if collector else "Unknown"
+        'current_app': activities[0].active_app if activities.exists() else "None"
     }
 
     return JsonResponse(data)
@@ -92,12 +92,16 @@ def statistics(request):
 
     if today_activities.exists():
         total = today_activities.count()
-        focused = today_activities.filter(status='Focused').count()
-        distracted = today_activities.filter(status='Distracted').count()
-        doomscrolling = today_activities.filter(status='Doomscrolling').count()
-        high_risk = today_activities.filter(status='High Dopamine Risk').count()
-        deep_focus = today_activities.filter(status='Deep Focus Session').count()
-        todays_spikes = today_activities.filter(status='DOPAMINE SPIKE DETECTED').count()
+        
+        # Status counts including Neutral
+        status_counts = dict(today_activities.values('status').annotate(count=Count('id')).values_list('status', 'count'))
+        
+        focused = status_counts.get('Focused', 0) + status_counts.get('Deep Focus Session', 0)
+        distracted = status_counts.get('Distracted', 0) + status_counts.get('DOPAMINE SPIKE DETECTED', 0)
+        doomscrolling = status_counts.get('Doomscrolling', 0) + status_counts.get('High Dopamine Risk', 0)
+        neutral = status_counts.get('Neutral', 0)
+        
+        total_active = focused + distracted + doomscrolling + neutral
 
         aggregates = today_activities.aggregate(
             avg_dopamine=Avg('dopamine_score'),
@@ -106,80 +110,75 @@ def statistics(request):
         avg_dopamine = aggregates['avg_dopamine'] or 0
         avg_typing_speed = aggregates['avg_typing_speed'] or 0
 
-        # Calculate late night usage (from all activities or today?) 
-        # Keep focused seconds for today
-        night_seconds = today_activities.filter(timestamp__hour__in=[23, 0, 1, 2]).count() * 5
+        # Efficient night usage calculation (7s intervals)
+        night_seconds = today_activities.filter(timestamp__hour__in=[23, 0, 1, 2]).count() * 7
         late_night_usage = format_time(night_seconds)
 
         # Daily report
-        focus_seconds = today_activities.filter(status__in=['Focused', 'Deep Focus Session']).count() * 5
-        doomscroll_seconds = today_activities.filter(status__in=['Doomscrolling', 'High Dopamine Risk']).count() * 5
+        focus_seconds = focused * 7
+        doomscroll_seconds = doomscrolling * 7
         
-        distraction_by_hour = today_activities.filter(status__in=['Distracted', 'DOPAMINE SPIKE DETECTED', 'Doomscrolling', 'High Dopamine Risk']).values('timestamp__hour').annotate(count=Count('timestamp__hour')).order_by('-count')
-        if distraction_by_hour:
-            peak_hour = distraction_by_hour[0]['timestamp__hour']
-            peak_distraction_time = f"{peak_hour % 12 or 12} {'PM' if peak_hour >= 12 else 'AM'}"
-        else:
-            peak_distraction_time = "N/A"
+        distraction_by_hour = today_activities.filter(status__in=['Distracted', 'Doomscrolling', 'High Dopamine Risk']).values('timestamp__hour').annotate(count=Count('timestamp__hour')).order_by('-count')
+        peak_distraction_time = f"{distraction_by_hour[0]['timestamp__hour'] % 12 or 12} {'PM' if distraction_by_hour[0]['timestamp__hour'] >= 12 else 'AM'}" if distraction_by_hour else "N/A"
         
         top_apps_list = get_top_apps()
         most_used_app = top_apps_list[0]['active_app'] if top_apps_list else "None"
 
-        # Distraction alert
-        recent_10_min = today_activities.filter(timestamp__gte=timezone.now() - timedelta(minutes=10))
-        distraction_count = recent_10_min.filter(status__in=['Distracted', 'DOPAMINE SPIKE DETECTED']).count()
-        distraction_alert = distraction_count >= 3
+        # Distraction alert (last 10 mins)
+        ten_min_ago = timezone.now() - timedelta(minutes=10)
+        distraction_alert = today_activities.filter(timestamp__gte=ten_min_ago, status__in=['Distracted', 'DOPAMINE SPIKE DETECTED']).count() >= 3
 
         # Weekly report
-        week_ago = datetime.datetime.now() - timedelta(days=7)
-        weekly_activities = activities.filter(timestamp__gte=week_ago)
-        weekly_focus = weekly_activities.filter(status__in=['Focused', 'Deep Focus Session'])
+        week_ago = timezone.now() - timedelta(days=7)
+        weekly_activities = UserActivity.objects.filter(timestamp__gte=week_ago)
         weekly_total = weekly_activities.count()
-        weekly_focus_score = (weekly_focus.count() / weekly_total * 100) if weekly_total > 0 else 0
-
-        focus_by_day = weekly_focus.annotate(day=ExtractWeekDay('timestamp')).values('day').annotate(count=Count('day')).order_by('-count')
-        days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-        most_productive_day = days[focus_by_day[0]['day'] - 1] if focus_by_day else 'N/A'
-
-        weekly_distracted = weekly_activities.filter(status__in=['Distracted', 'DOPAMINE SPIKE DETECTED'])
-        distracted_by_day = weekly_distracted.annotate(day=ExtractWeekDay('timestamp')).values('day').annotate(count=Count('day')).order_by('-count')
-        worst_day = days[distracted_by_day[0]['day'] - 1] if distracted_by_day else 'N/A'
+        
+        if weekly_total > 0:
+            weekly_focus_count = weekly_activities.filter(status__in=['Focused', 'Deep Focus Session']).count()
+            weekly_focus_score = (weekly_focus_count / weekly_total * 100)
+            
+            # Day analysis
+            days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+            
+            focus_by_day = weekly_activities.filter(status__in=['Focused', 'Deep Focus Session']).annotate(day=ExtractWeekDay('timestamp')).values('day').annotate(count=Count('day')).order_by('-count')
+            most_productive_day = days[focus_by_day[0]['day'] - 1] if focus_by_day else 'N/A'
+            
+            distracted_by_day = weekly_activities.filter(status__in=['Distracted', 'DOPAMINE SPIKE DETECTED']).annotate(day=ExtractWeekDay('timestamp')).values('day').annotate(count=Count('day')).order_by('-count')
+            worst_day = days[distracted_by_day[0]['day'] - 1] if distracted_by_day else 'N/A'
+        else:
+            weekly_focus_score = 0
+            most_productive_day = 'N/A'
+            worst_day = 'N/A'
 
         # Today's insights
-        total_switches = sum(a.app_switch_count for a in today_activities)
-        total_hours = total * 5 / 3600
-        switches_per_minute = total_switches / (total_hours * 60) if total_hours > 0 else 0
+        total_switches = today_activities.aggregate(total=Sum('app_switch_count'))['total'] or 0
+        total_minutes = float(total * 7 / 60)
+        switches_per_minute = total_switches / total_minutes if total_minutes > 0 else 0
         switches_every_minutes = round(1 / switches_per_minute, 1) if switches_per_minute > 0 else 0
 
         productive_by_hour = today_activities.filter(status__in=['Focused', 'Deep Focus Session']).values('timestamp__hour').annotate(count=Count('timestamp__hour')).order_by('-count')
-        if productive_by_hour:
-            hour = productive_by_hour[0]['timestamp__hour']
-            most_productive_time = f"{hour} AM" if hour < 12 else f"{hour % 12 or 12} PM"
-        else:
-            most_productive_time = "N/A"
+        most_productive_time = f"{productive_by_hour[0]['timestamp__hour'] % 12 or 12} {'PM' if productive_by_hour[0]['timestamp__hour'] >= 12 else 'AM'}" if productive_by_hour else "N/A"
 
         doomscroll_by_hour = today_activities.filter(status__in=['Doomscrolling', 'High Dopamine Risk']).values('timestamp__hour').annotate(count=Count('timestamp__hour')).order_by('-count')
-        if doomscroll_by_hour:
-            hour = doomscroll_by_hour[0]['timestamp__hour']
-            doomscroll_peak = f"at {hour % 12 or 12} {'PM' if hour >= 12 else 'AM'}"
-        else:
-            doomscroll_peak = "N/A"
+        doomscroll_peak = f"at {doomscroll_by_hour[0]['timestamp__hour'] % 12 or 12} {'PM' if doomscroll_by_hour[0]['timestamp__hour'] >= 12 else 'AM'}" if doomscroll_by_hour else "N/A"
 
-        # Dopamine timeline for today - more points for better graph
+        # Timeline
         recent_dopamine = today_activities.order_by('-timestamp')[:50]
         dopamine_timeline = [timezone.localtime(a.timestamp).strftime('%H:%M:%S') for a in reversed(recent_dopamine)]
         dopamine_scores = [a.dopamine_score for a in reversed(recent_dopamine)]
 
+        # Total active sessions for meaningful percentages
+        total_active = focused + distracted + doomscrolling + neutral
+        
         stats = {
             'total_sessions': total,
-            'focused_percentage': (focused / total) * 100,
-            'distracted_percentage': (distracted / total) * 100,
-            'doomscrolling_percentage': (doomscrolling / total) * 100,
-            'high_risk_percentage': (high_risk / total) * 100,
-            'deep_work_sessions': deep_focus,
-            'todays_dopamine_spikes': todays_spikes,
-            'avg_dopamine_score': round(avg_dopamine, 2),
-            'avg_typing_speed': round(avg_typing_speed, 2),
+            'focused_percentage': (focused / total * 100) if total > 0 else 0,
+            'distracted_percentage': (distracted / total * 100) if total > 0 else 0,
+            'doomscrolling_percentage': (doomscrolling / total * 100) if total > 0 else 0,
+            'neutral_percentage': (neutral / total * 100) if total > 0 else 0,
+            'high_risk_percentage': 0, # Legacy support for UI
+            'avg_dopamine_score': round(float(avg_dopamine), 2),
+            'avg_typing_speed': round(float(avg_typing_speed), 2),
             'late_night_usage': late_night_usage,
             'dopamine_timeline': dopamine_timeline,
             'dopamine_scores': dopamine_scores,
@@ -193,7 +192,7 @@ def statistics(request):
                 'worst_day': worst_day
             },
             'todays_insights': {
-                'app_switch_frequency': f"every {switches_every_minutes} minutes",
+                'app_switch_frequency': f"{switches_every_minutes} mins" if switches_every_minutes > 0 else "N/A",
                 'most_productive_time': most_productive_time,
                 'doomscroll_peak': doomscroll_peak
             },
@@ -206,9 +205,7 @@ def statistics(request):
             'focused_percentage': 0,
             'distracted_percentage': 0,
             'doomscrolling_percentage': 0,
-            'high_risk_percentage': 0,
-            'deep_work_sessions': 0,
-            'todays_dopamine_spikes': 0,
+            'neutral_percentage': 0,
             'avg_dopamine_score': 0,
             'avg_typing_speed': 0,
             'late_night_usage': '0h 0m',
@@ -300,8 +297,12 @@ def export_pdf(request):
     response = HttpResponse(content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="activity_report_{today}.pdf"'
 
+    if not letter or not canvas:
+        return HttpResponse("PDF generation library (reportlab) not installed.", status=501)
+        
     p = canvas.Canvas(response, pagesize=letter)
     width, height = letter
+    height = float(height)
 
     # Title
     p.setFont("Helvetica-Bold", 16)
@@ -326,13 +327,14 @@ def export_pdf(request):
         if y < 50:
             p.showPage()
             p.setFont("Helvetica", 9)
-            y = height - 50
+            y = height - 50.0
             
         category = get_category(activity.active_app)
         local_time = timezone.localtime(activity.timestamp).strftime('%H:%M:%S')
         
         p.drawString(50, y, local_time)
-        p.drawString(150, y, str(activity.active_app)[:25])
+        app_name = str(activity.active_app or "Unknown")
+        p.drawString(150, y, app_name[0:25])
         p.drawString(300, y, category)
         p.drawString(400, y, str(activity.dopamine_score))
         p.drawString(450, y, str(activity.status))
@@ -341,3 +343,41 @@ def export_pdf(request):
 
     p.save()
     return response
+
+@csrf_exempt
+def report_activity(request):
+    """API endpoint for remote clients to submit activity data"""
+    if request.method == 'POST':
+        import json
+        try:
+            data = json.loads(request.body)
+            app = data.get('app', 'Unknown')
+            typing_speed = data.get('typing_speed', 0)
+            switches = data.get('switches', 0)
+            
+            # Server-side re-categorization for better accuracy
+            category = get_category(app)
+            if category == 'productive':
+                status = "Focused"
+            elif category == 'dopamine' or switches > 3:
+                status = "Doomscrolling" if category == 'dopamine' else "Distracted"
+            else:
+                status = "Neutral"
+                
+            # Recalculate dopamine score on server
+            raw_score = float(typing_speed * 0.2 + switches * 15)
+            if category == 'dopamine': raw_score += 40
+            score = int(min(100.0, raw_score))
+            
+            activity = UserActivity(
+                active_app=app,
+                typing_speed=typing_speed,
+                app_switch_count=switches,
+                dopamine_score=score,
+                status=status
+            )
+            activity.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)

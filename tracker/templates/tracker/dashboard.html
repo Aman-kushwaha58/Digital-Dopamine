@@ -3,269 +3,458 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Digital Dopamine - Screen Addiction Tracker</title>
+    <title>Digital Dopamine Tracker</title>
 
     {% load static %}
-
-    <!-- Chart.js -->
+    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@400;600;700&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-    <!-- PWA -->
-    <link rel="manifest" href="{% static 'pwa/manifest.json' %}">
-    <meta name="theme-color" content="#0f172a">
-
-    <script>
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register("{% static 'pwa/sw.js' %}")
-                .then(() => console.log("Service Worker Registered"));
-        }
-    </script>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
 
     <style>
-        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
-        .container { max-width: 1200px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .controls { display: flex; gap: 10px; margin-bottom: 20px; justify-content: center; }
-        button { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-        .start-btn { background: #4CAF50; color: white; }
-        .stop-btn { background: #f44336; color: white; }
-        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
-        .stat-card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
-        .stat-value { font-size: 24px; font-weight: bold; margin: 10px 0; }
-        .charts { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
-        .chart-container { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .activity-table { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px; border-bottom: 1px solid #ddd; }
-        th { background-color: #f8f9fa; }
-
-        .daily-report { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 30px; }
-        .daily-report h3 { margin-top: 0; }
-        .daily-report p { margin: 10px 0; }
-
-        .status-focused { color: #4CAF50; font-weight: bold; }
-        .status-distracted { color: #FF9800; font-weight: bold; }
-        .status-doomscrolling { color: #f44336; font-weight: bold; }
-        .status-high-dopamine-risk { color: #9c27b0; font-weight: bold; }
-        .status-deep-focus-session { color: #2196f3; font-weight: bold; text-transform: uppercase; }
-        .status-dopamine-spike-detected { color: #e91e63; font-weight: bold; border: 1px solid #e91e63; padding: 2px 4px; border-radius: 3px; }
-        .status-neutral { color: #64748b; }
-
-        .activity-table { overflow-x: auto; }
-        table { width: 100%; border-collapse: collapse; min-width: 600px; }
-        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        th { background-color: #f1f5f9; color: #475569; font-weight: 600; text-transform: uppercase; font-size: 0.75rem; }
-        tr:hover { background-color: #f8fafc; }
-    </style>
-</head>
-
-<body>
-<div class="container">
-
-    <div class="header">
-        <h1>🧠 Digital Dopamine Tracker</h1>
-        <p>Monitor your screen addiction in real-time</p>
-        <div id="liveStatus" style="background: #e2e8f0; padding: 10px; border-radius: 5px; display: inline-block; margin-top: 10px; font-weight: bold;">
-            Current App: <span id="currentApp" style="color: #2563eb;">Detecting...</span>
-        </div>
-    </div>
-
-    <div class="controls">
-        <button class="start-btn" onclick="startTracking()">Start Tracking</button>
-        <button class="stop-btn" onclick="stopTracking()">Stop Tracking</button>
-        <button onclick="window.location.href='{% url 'export_csv' %}'" style="background: #2196F3; color: white;">Download CSV</button>
-        <button onclick="window.location.href='{% url 'export_pdf' %}'" style="background: #FF5722; color: white;">Download PDF</button>
-    </div>
-
-    <div id="alert" style="display: none; background: #ffebee; color: #c62828; padding: 10px; border-radius: 5px; margin-bottom: 20px; font-weight: bold; text-align: center;">
-        ⚠️ You are entering a distraction loop. Take a break!
-    </div>
-
-    <div class="daily-report">
-        <h3>Daily Behavior Report 📊</h3>
-        <p>Your Focus Time: <strong id="focusTime">-</strong></p>
-        <p>Your Doomscroll Time: <strong id="doomscrollTime">-</strong></p>
-        <p>Peak Distraction Time: <strong id="peakDistractionTime">-</strong></p>
-        <p>Most Used App: <strong id="mostUsedApp">-</strong></p>
-        <h4>Weekly Report</h4>
-        <p>Weekly Focus Score: <strong id="weeklyFocusScore">-</strong>%</p>
-        <p>Most Productive Day: <strong id="mostProductiveDay">-</strong></p>
-        <p>Worst Day: <strong id="worstDay">-</strong></p>
-    </div>
-
-    <div class="daily-report">
-        <h3>Today's Insights 💡</h3>
-        <p>You switch apps <strong id="appSwitchFrequency">-</strong></p>
-        <p>You are most productive at <strong id="mostProductiveTime">-</strong></p>
-        <p>You doomscroll most <strong id="doomscrollPeak">-</strong></p>
-    </div>
-
-    <div class="stats-grid" id="statsGrid"></div>
-
-    <div class="charts">
-        <div class="chart-container">
-            <canvas id="statusChart"></canvas>
-        </div>
-        <div class="chart-container">
-            <canvas id="dopamineChart"></canvas>
-        </div>
-    </div>
-
-    <div class="activity-table">
-        <h3>Recent Activity</h3>
-        <div id="activityTable">Loading...</div>
-    </div>
-
-</div>
-
-<script>
-    let statusChart = null;
-    let dopamineChart = null;
-
-    function getCSRFToken() {
-        return document.cookie
-            .split('; ')
-            .find(row => row.startsWith('csrftoken='))
-            ?.split('=')[1];
-    }
-
-    async function startTracking() {
-        const res = await fetch('/api/start/', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCSRFToken() }
-        });
-        const data = await res.json();
-        alert(data.message);
-    }
-
-    async function stopTracking() {
-        const res = await fetch('/api/stop/', {
-            method: 'POST',
-            headers: { 'X-CSRFToken': getCSRFToken() }
-        });
-        const data = await res.json();
-        alert(data.message);
-    }
-
-    async function loadStats() {
-        const res = await fetch('/api/stats/');
-        const stats = await res.json();
-
-        document.getElementById('statsGrid').innerHTML = `
-            <div class="stat-card"><div>Total Sessions</div><div class="stat-value">${stats.total_sessions}</div></div>
-            <div class="stat-card"><div>Focused</div><div class="stat-value status-focused">${stats.focused_percentage.toFixed(1)}%</div></div>
-            <div class="stat-card"><div>Distracted</div><div class="stat-value status-distracted">${stats.distracted_percentage.toFixed(1)}%</div></div>
-            <div class="stat-card"><div>Doomscrolling</div><div class="stat-value status-doomscrolling">${stats.doomscrolling_percentage.toFixed(1)}%</div></div>
-            <div class="stat-card"><div>High Risk</div><div class="stat-value status-doomscrolling">${stats.high_risk_percentage.toFixed(1)}%</div></div>
-            <div class="stat-card"><div>Deep Work Sessions</div><div class="stat-value">${stats.deep_work_sessions}</div></div>
-            <div class="stat-card"><div>Today's Dopamine Spikes</div><div class="stat-value">${stats.todays_dopamine_spikes}</div></div>
-            <div class="stat-card"><div>Late Night Usage</div><div class="stat-value">${stats.late_night_usage}</div></div>
-            <div class="stat-card"><div>Avg Dopamine</div><div class="stat-value">${stats.avg_dopamine_score}</div></div>
-            <div class="stat-card"><div>Typing Speed</div><div class="stat-value">${stats.avg_typing_speed} KPM</div></div>
-        `;
-
-        // Update Daily Behavior Report
-        document.getElementById('focusTime').innerText = stats.daily_report.focus_time;
-        document.getElementById('doomscrollTime').innerText = stats.daily_report.doomscroll_time;
-        document.getElementById('peakDistractionTime').innerText = stats.daily_report.peak_distraction_time;
-        document.getElementById('mostUsedApp').innerText = stats.daily_report.most_used_app;
-        document.getElementById('weeklyFocusScore').innerText = stats.daily_report.weekly_focus_score;
-        document.getElementById('mostProductiveDay').innerText = stats.daily_report.most_productive_day;
-        document.getElementById('worstDay').innerText = stats.daily_report.worst_day;
-
-        // Update Today's Insights
-        document.getElementById('appSwitchFrequency').innerText = stats.todays_insights.app_switch_frequency;
-        document.getElementById('mostProductiveTime').innerText = stats.todays_insights.most_productive_time;
-        document.getElementById('doomscrollPeak').innerText = stats.todays_insights.doomscroll_peak;
-
-        // Show distraction alert
-        const alertDiv = document.getElementById('alert');
-        if (stats.distraction_alert) {
-            alertDiv.style.display = 'block';
-        } else {
-            alertDiv.style.display = 'none';
+        :root {
+            --bg-color: #f4f7f6;
+            --text-color: #333;
+            --card-bg: #ffffff;
+            --primary: #2196f3;
+            --success: #4caf50;
+            --danger: #f44336;
+            --warning: #ff9800;
+            --orange: #ff5722;
+            --border-color: #e0e0e0;
         }
 
-        updateCharts(stats);
-    }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
 
-    function updateCharts(stats) {
-        if (statusChart) statusChart.destroy();
-        if (dopamineChart) dopamineChart.destroy();
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            padding: 15px;
+            line-height: 1.6;
+        }
 
-        statusChart = new Chart(document.getElementById('statusChart'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Focused', 'Distracted', 'Doomscrolling', 'High Risk'],
-                datasets: [{
-                    data: [
-                        stats.focused_percentage,
-                        stats.distracted_percentage,
-                        stats.doomscrolling_percentage,
-                        stats.high_risk_percentage
-                    ],
-                    backgroundColor: ['#4CAF50', '#FF9800', '#f44336', '#9C27B0']
-                }]
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 20px;
+        }
+
+        .header-top {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .current-app-pill {
+            display: inline-block;
+            background: #e3f2fd;
+            color: #2196f3;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid #bbdefb;
+            margin-bottom: 20px;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 25px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 4px;
+            border: none;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            min-width: 100px;
+        }
+
+        .btn-start { background-color: var(--success); }
+        .btn-stop { background-color: var(--danger); }
+        .btn-csv { background-color: var(--primary); }
+        .btn-pdf { background-color: var(--orange); }
+
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .card h3 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .report-item {
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .report-item strong {
+            font-weight: 600;
+        }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+            border: 1px solid var(--border-color);
+        }
+
+        .metric-label {
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .charts-section {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 25px;
+        }
+
+        .activity-feed {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 600px;
+        }
+
+        th {
+            text-align: left;
+            background: #f8f9fa;
+            padding: 10px;
+            border-bottom: 2px solid var(--border-color);
+            color: #666;
+        }
+
+        td {
+            padding: 10px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .status-focused { color: #2e7d32; }
+        .status-distracted { color: #ed6c02; }
+        .status-doomscrolling { color: #d32f2f; }
+
+        @media (max-width: 600px) {
+            body { padding: 10px; }
+            .btn { flex: 1; min-width: 45%; }
+            .metric-card { padding: 10px; }
+            .metric-value { font-size: 18px; }
+            .dashboard-grid, .charts-section {
+                grid-template-columns: 1fr;
             }
-        });
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-top">
+                <span>🧠</span>
+                <h1>Digital Dopamine Tracker</h1>
+            </div>
+            <p class="subtitle">Monitor your screen addiction in real-time</p>
+            <div class="current-app-pill">
+                Current App: <span id="currentApp">Loading...</span>
+            </div>
+            <div id="syncIndicator" style="font-size: 11px; color: #888; margin-top: -15px; margin-bottom: 20px;">
+                <span style="display: inline-block; width: 8px; height: 8px; background: #4caf50; border-radius: 50%; margin-right: 5px;"></span>
+                Last Sync: <span id="lastSync">Just now</span>
+            </div>
+        </header>
 
-        dopamineChart = new Chart(document.getElementById('dopamineChart'), {
-            type: 'line',
-            data: {
-                labels: stats.dopamine_timeline || [],
-                datasets: [{
-                    label: 'Dopamine Score',
-                    data: stats.dopamine_scores || [],
-                    borderColor: '#2196F3',
-                    fill: false,
-                    tension: 0.3
-                }]
+        <div class="controls">
+            <button class="btn btn-start" onclick="startTracking();">Start Tracking</button>
+            <button class="btn btn-stop" onclick="stopTracking();">Stop Tracking</button>
+            <button class="btn btn-csv" onclick="window.location.href='{% url 'export_csv' %}';">Download CSV</button>
+            <button class="btn btn-pdf" onclick="window.location.href='{% url 'export_pdf' %}';">Download PDF</button>
+        </div>
+
+        <div class="dashboard-grid">
+            <div class="card">
+                <h3>Daily Behavior Report 📊</h3>
+                <div class="report-item">Your Focus Time: <strong id="focusTime">-</strong></div>
+                <div class="report-item">Your Doomscroll Time: <strong id="doomscrollTime">-</strong></div>
+                <div class="report-item">Peak Distraction Time: <strong id="peakDistractionTime">-</strong></div>
+                <div class="report-item">Most Used App: <strong id="mostUsedApp">-</strong></div>
+                <br>
+                <strong>Weekly Report</strong>
+                <div class="report-item">Weekly Focus Score: <strong id="weeklyFocusScore">-</strong>%</div>
+                <div class="report-item">Most Productive Day: <strong id="mostProductiveDay">-</strong></div>
+                <div class="report-item">Worst Day: <strong id="worstDay">-</strong></div>
+            </div>
+
+            <div class="card">
+                <h3>Today's Insights 💡</h3>
+                <div class="report-item">App Switch Frequency: <strong id="appSwitchFrequency">-</strong></div>
+                <div class="report-item">Most Productive Time: <strong id="mostProductiveTime">-</strong></div>
+                <div class="report-item">Doomscroll Peak: <strong id="doomscrollPeak">-</strong></div>
+            </div>
+        </div>
+
+        <div class="metrics-grid" id="metricsGrid">
+            <div class="metric-card">
+                <div class="metric-label">Total Sessions</div>
+                <div class="metric-value" id="totalSessions">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Focused</div>
+                <div class="metric-value" style="color: #4caf50" id="focusedPct">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Distracted</div>
+                <div class="metric-value" style="color: #ff9800" id="distractedPct">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Doomscrolling</div>
+                <div class="metric-value" style="color: #f44336" id="doomscrollPct">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Neutral</div>
+                <div class="metric-value" style="color: #9e9e9e" id="neutralPct">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Avg Dopamine</div>
+                <div class="metric-value" id="avgDopamine">-</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-label">Typing Speed</div>
+                <div class="metric-value" id="typingSpeed">-</div>
+            </div>
+        </div>
+
+        <div class="charts-section">
+            <div class="card">
+                <h3>Activity Distribution</h3>
+                <canvas id="statusChart"></canvas>
+            </div>
+            <div class="card">
+                <h3>Dopamine Levels</h3>
+                <canvas id="dopamineChart"></canvas>
+            </div>
+        </div>
+
+        <div class="activity-feed">
+            <h3 style="margin-bottom: 20px;">Recent Activity</h3>
+            <div class="table-container">
+                <table id="activityTable">
+                    <thead>
+                        <tr>
+                            <th>TIME</th>
+                            <th>APP</th>
+                            <th>CATEGORY</th>
+                            <th>TYPING SPEED</th>
+                            <th>DOPAMINE</th>
+                            <th>STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody id="activityBody">
+                        <tr><td colspan="6" style="text-align: center;">Syncing data...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let statusChart = null;
+        let dopamineChart = null;
+
+        function getCSRFToken() {
+            return document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1];
+        }
+
+        async function startTracking() {
+            const res = await fetch('/api/start/', { method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() } });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        async function stopTracking() {
+            const res = await fetch('/api/stop/', { method: 'POST', headers: { 'X-CSRFToken': getCSRFToken() } });
+            const data = await res.json();
+            alert(data.message);
+        }
+
+        async function fetchData() {
+            try {
+                const [statsRes, activityRes] = await Promise.all([
+                    fetch('/api/stats/'),
+                    fetch('/api/activity/')
+                ]);
+                const stats = await statsRes.json();
+                const activity = await activityRes.json();
+                updateUI(stats, activity);
+                document.getElementById('lastSync').innerText = new Date().toLocaleTimeString();
+            } catch(e) { console.error(e); }
+        }
+
+        function updateUI(stats, activity) {
+            document.getElementById('currentApp').innerText = activity.current_app || "Unknown";
+            
+            // Reports
+            document.getElementById('focusTime').innerText = stats.daily_report.focus_time;
+            document.getElementById('doomscrollTime').innerText = stats.daily_report.doomscroll_time;
+            document.getElementById('peakDistractionTime').innerText = stats.daily_report.peak_distraction_time;
+            document.getElementById('mostUsedApp').innerText = stats.daily_report.most_used_app;
+            document.getElementById('weeklyFocusScore').innerText = stats.daily_report.weekly_focus_score;
+            document.getElementById('mostProductiveDay').innerText = stats.daily_report.most_productive_day;
+            document.getElementById('worstDay').innerText = stats.daily_report.worst_day;
+
+            document.getElementById('appSwitchFrequency').innerText = stats.todays_insights.app_switch_frequency;
+            document.getElementById('mostProductiveTime').innerText = stats.todays_insights.most_productive_time;
+            document.getElementById('doomscrollPeak').innerText = stats.todays_insights.doomscroll_peak;
+
+            // Metrics
+            document.getElementById('totalSessions').innerText = stats.total_sessions;
+            document.getElementById('focusedPct').innerText = stats.focused_percentage.toFixed(1) + '%';
+            document.getElementById('distractedPct').innerText = stats.distracted_percentage.toFixed(1) + '%';
+            document.getElementById('doomscrollPct').innerText = stats.doomscrolling_percentage.toFixed(1) + '%';
+            if (document.getElementById('neutralPct')) {
+                document.getElementById('neutralPct').innerText = stats.neutral_percentage.toFixed(1) + '%';
             }
-        });
-    }
+            document.getElementById('avgDopamine').innerText = stats.avg_dopamine_score;
+            document.getElementById('typingSpeed').innerText = stats.avg_typing_speed + ' KPM';
 
-    async function loadActivity() {
-        const res = await fetch('/api/activity/');
-        const data = await res.json();
+            // Charts
+            updateCharts(stats);
+            // Table
+            updateTable(activity.activities);
+        }
 
-        let rows = data.activities.map(a => {
-            const statusClass = a.status.toLowerCase().replace(/\s+/g, '-');
-            return `
+        function updateCharts(stats) {
+            const ctxStatus = document.getElementById('statusChart').getContext('2d');
+            const ctxDopamine = document.getElementById('dopamineChart').getContext('2d');
+
+            if (!statusChart) {
+                statusChart = new Chart(ctxStatus, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['Focused', 'Distracted', 'Doomscrolling', 'Neutral'],
+                        datasets: [{
+                            data: [stats.focused_percentage, stats.distracted_percentage, stats.doomscrolling_percentage, stats.neutral_percentage],
+                            backgroundColor: ['#4caf50', '#ff9800', '#f44336', '#9e9e9e']
+                        }]
+                    },
+                    options: { plugins: { legend: { position: 'top' } } }
+                });
+            } else {
+                statusChart.data.datasets[0].data = [stats.focused_percentage, stats.distracted_percentage, stats.doomscrolling_percentage, stats.neutral_percentage];
+                statusChart.update('none');
+            }
+
+            if (!dopamineChart) {
+                dopamineChart = new Chart(ctxDopamine, {
+                    type: 'line',
+                    data: {
+                        labels: stats.dopamine_timeline,
+                        datasets: [{
+                            label: 'Dopamine Score',
+                            data: stats.dopamine_scores,
+                            borderColor: '#2196f3',
+                            tension: 0.3
+                        }]
+                    }
+                });
+            } else {
+                dopamineChart.data.labels = stats.dopamine_timeline;
+                dopamineChart.data.datasets[0].data = stats.dopamine_scores;
+                dopamineChart.update('none');
+            }
+        }
+
+        function updateTable(activities) {
+            const tbody = document.getElementById('activityBody');
+            tbody.innerHTML = activities.map(a => `
                 <tr>
                     <td>${a.timestamp}</td>
                     <td>${a.app}</td>
                     <td>${a.category}</td>
                     <td>${a.typing_speed} KPM</td>
-                    <td>${a.app_switches}</td>
                     <td>${a.dopamine_score}</td>
-                    <td class="status-${statusClass}">${a.status}</td>
+                    <td><span class="status-pill status-${a.status.toLowerCase()}">${a.status}</span></td>
                 </tr>
-            `;
-        }).join('');
+            `).join('');
+        }
 
-        document.getElementById('activityTable').innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th>Time</th><th>App</th><th>Category</th><th>Typing</th>
-                        <th>Switches</th><th>Dopamine</th><th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>${rows}</tbody>
-            </table>
-        `;
-
-        document.getElementById('currentApp').innerText = data.current_app;
-    }
-
-    function refreshData() {
-        loadStats();
-        loadActivity();
-    }
-
-    refreshData();
-    setInterval(refreshData, 3000);
-</script>
-
+        fetchData();
+        setInterval(fetchData, 7000);
+    </script>
 </body>
 </html>

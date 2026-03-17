@@ -1,0 +1,10 @@
+# Digital Dopamine Projekt .gitignore
+*.pyc
+__pycache__/
+db.sqlite3
+.venv/
+.env
+staticfiles/
+.vscode/
+.idea/
+*.log

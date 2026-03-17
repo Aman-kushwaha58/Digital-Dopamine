@@ -57,6 +57,10 @@ class DataCollector:
         
     def get_active_app(self):
         """Get currently active application (Windows)"""
+        import os
+        if os.name != 'nt':
+            return "Active Client (Remote)"
+            
         try:
             if not win32gui or not win32process:
                 return "Unknown (Install pywin32)"
@@ -74,13 +78,17 @@ class DataCollector:
             
             # Get foreground window
             hwnd = win32gui.GetForegroundWindow()
+            if not hwnd: return "Desktop/Background"
+            
             window_title = get_window_title(hwnd)
             process_name = get_process_name(hwnd)
             
             # Return meaningful app name
-            if window_title:
+            if window_title or process_name:
                 # Extract app name from window title or process
-                title_lower = window_title.lower()
+                title_lower = window_title.lower() if window_title else ""
+                proc_lower = process_name.lower() if process_name else ""
+                
                 if "youtube" in title_lower:
                     return "YouTube"
                 elif "instagram" in title_lower:
@@ -91,31 +99,27 @@ class DataCollector:
                     return "Reddit"
                 elif "facebook" in title_lower:
                     return "Facebook"
-                elif "chrome" in process_name.lower() or "msedge" in process_name.lower():
+                elif "chrome" in proc_lower or "msedge" in proc_lower:
                     return "Browser"
-                elif "notepad" in process_name.lower():
+                elif "notepad" in proc_lower:
                     return "Notepad"
-                elif "code" in process_name.lower() or "pycharm" in process_name.lower():
+                elif "code" in proc_lower or "pycharm" in proc_lower:
                     return "Code Editor"
-                elif "explorer" in process_name.lower():
+                elif "explorer" in proc_lower:
                     return "File Explorer"
-                elif "cmd" in process_name.lower() or "powershell" in process_name.lower():
+                elif "cmd" in proc_lower or "powershell" in proc_lower:
                     return "Terminal"
-                elif "word" in process_name.lower():
+                elif "word" in proc_lower:
                     return "Microsoft Word"
-                elif "excel" in process_name.lower():
+                elif "excel" in proc_lower:
                     return "Microsoft Excel"
-                elif "powerpoint" in process_name.lower():
+                elif "powerpoint" in proc_lower:
                     return "Microsoft PowerPoint"
                 else:
-                    # Return process name without .exe
                     return process_name.replace('.exe', '').title()
             else:
                 return "Desktop/Background"
                 
-        except ImportError:
-            # Fallback if win32gui not available
-            return "Unknown (Install pywin32)"
         except Exception as e:
             return f"Error: {str(e)}"
     
@@ -172,21 +176,37 @@ class DataCollector:
     def collect_data(self):
         """Main data collection loop"""
 
+        self.is_collecting = True
+        
+        # Start keyboard listener with robust error handling
         if keyboard:
             try:
-                keyboard_listener = keyboard.Listener(on_press=self.on_press)
+                def on_press_wrapper(key):
+                    try:
+                        self.on_press(key)
+                    except:
+                        pass # Ignore listener internal errors
+                
+                keyboard_listener = keyboard.Listener(on_press=on_press_wrapper)
+                keyboard_listener.daemon = True
                 keyboard_listener.start()
             except Exception as e:
-                print(f"Keyboard listener failed to start: {e}")
+                print(f"Keyboard listener failed (Python 3.13 compatibility issue): {e}")
 
+        # Start mouse listener with robust error handling
         if mouse:
             try:
-                mouse_listener = mouse.Listener(on_scroll=self.on_scroll)
+                def on_scroll_wrapper(x, y, dx, dy):
+                    try:
+                        self.on_scroll(x, y, dx, dy)
+                    except:
+                        pass
+                
+                mouse_listener = mouse.Listener(on_scroll=on_scroll_wrapper)
+                mouse_listener.daemon = True
                 mouse_listener.start()
             except Exception as e:
-                print(f"Mouse listener failed to start: {e}")
-        
-        self.is_collecting = True
+                print(f"Mouse listener failed: {e}")
         
         while self.is_collecting:
             # Check if it's night time
