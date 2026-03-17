@@ -6,7 +6,7 @@ from datetime import datetime
 
 # CONFIGURATION
 # Set this to your Render URL (e.g., 'https://digital-dopamine.onrender.com')
-SERVER_URL = "http://localhost:8000" 
+SERVER_URL = "https://digital-dopamine-2.onrender.com" 
 
 try:
     import win32gui

@@ -10,7 +10,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY', '6af281df1a5aff3eee8b0d9bd1b9b979')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'True').lower() == 'true'
 
-ALLOWED_HOSTS = ['*'] # In production, replace with your Render URL
+ALLOWED_HOSTS = ['digital-dopamine-2.onrender.com', 'localhost', '127.0.0.1', '*']
 
 # Application definition
 INSTALLED_APPS = [
