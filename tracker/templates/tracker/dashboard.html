@@ -335,6 +335,7 @@
                             <th>APP</th>
                             <th>CATEGORY</th>
                             <th>TYPING SPEED</th>
+                            <th>SWITCHES</th>
                             <th>DOPAMINE</th>
                             <th>STATUS</th>
                         </tr>
@@ -472,6 +473,7 @@
                         <td style="font-weight: 600;">${a.app}</td>
                         <td><span style="opacity: 0.7; font-size: 11px;">${a.category}</span></td>
                         <td>${a.typing_speed} <small>KPM</small></td>
+                        <td>${a.app_switches}</td>
                         <td><strong style="color: ${a.dopamine_score > 50 ? 'var(--danger)' : 'var(--success)'}">${a.dopamine_score}</strong></td>
                         <td><span class="status-pill status-${statusClass}">${a.status}</span></td>
                     </tr>
