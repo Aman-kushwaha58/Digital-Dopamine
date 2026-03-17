@@ -59,7 +59,7 @@ class DataCollector:
         """Get currently active application (Windows)"""
         import os
         if os.name != 'nt':
-            return "Active Client (Remote)"
+            return "" # Return empty on non-Windows (Server)
             
         try:
             if not win32gui or not win32process:
@@ -157,7 +157,7 @@ class DataCollector:
             return "Doomscrolling"
         elif app_switches > 5:
             return "Distracted"
-        elif typing_speed < 10 and self.current_app != "Unknown":
+        elif typing_speed < 10 and self.current_app not in ["Unknown", "Desktop", "Desktop/Background", "Browser", "File Explorer", "Terminal", ""]:
             return "Doomscrolling"
         elif typing_speed > 30 and app_switches <= 2:
             return "Focused"
@@ -248,15 +248,17 @@ class DataCollector:
             if self.app_switches > 5 and typing_speed < 5:
                 status = "DOPAMINE SPIKE DETECTED"
             
-            # Save to database
-            activity = UserActivity(
-                active_app=self.current_app,
-                typing_speed=typing_speed,
-                app_switch_count=self.app_switches,
-                dopamine_score=dopamine_score,
-                status=status
-            )
-            activity.save()
+            # Save to database (Only on Windows - preventing server-side dummy entries)
+            import os
+            if os.name == 'nt' and self.current_app:
+                activity = UserActivity(
+                    active_app=self.current_app,
+                    typing_speed=typing_speed,
+                    app_switch_count=self.app_switches,
+                    dopamine_score=dopamine_score,
+                    status=status
+                )
+                activity.save()
             
             # Reset counters for next period
             self.app_switches = 0

@@ -11,6 +11,7 @@ from django.db.models.functions import ExtractWeekDay
 from django.utils import timezone
 from .models import UserActivity
 from .data_collector import DataCollector
+from django.db import connection
 try:
     from reportlab.lib.pagesizes import letter
     from reportlab.pdfgen import canvas
@@ -84,6 +85,14 @@ def stop_tracking(request):
         'message': message
     })
 
+@csrf_exempt
+def clear_history(request):
+    """API endpoint to clear all activity history"""
+    if request.method == 'POST':
+        UserActivity.objects.all().delete()
+        return JsonResponse({'status': 'success', 'message': 'History cleared'})
+    return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+
 def statistics(request):
     """Get overall statistics"""
     today = timezone.now().date()
@@ -154,7 +163,7 @@ def statistics(request):
         total_switches = today_activities.aggregate(total=Sum('app_switch_count'))['total'] or 0
         total_minutes = float(total * 7 / 60)
         switches_per_minute = total_switches / total_minutes if total_minutes > 0 else 0
-        switches_every_minutes = round(1 / switches_per_minute, 1) if switches_per_minute > 0 else 0
+        switches_every_minutes = round(float(1 / switches_per_minute), 1) if switches_per_minute > 0 else 0
 
         productive_by_hour = today_activities.filter(status__in=['Focused', 'Deep Focus Session']).values('timestamp__hour').annotate(count=Count('timestamp__hour')).order_by('-count')
         most_productive_time = f"{productive_by_hour[0]['timestamp__hour'] % 12 or 12} {'PM' if productive_by_hour[0]['timestamp__hour'] >= 12 else 'AM'}" if productive_by_hour else "N/A"
@@ -334,7 +343,7 @@ def export_pdf(request):
         
         p.drawString(50, y, local_time)
         app_name = str(activity.active_app or "Unknown")
-        p.drawString(150, y, app_name[0:25])
+        p.drawString(150, y, str(app_name)[0:25])
         p.drawString(300, y, category)
         p.drawString(400, y, str(activity.dopamine_score))
         p.drawString(450, y, str(activity.status))
@@ -357,10 +366,16 @@ def report_activity(request):
             
             # Server-side re-categorization for better accuracy
             category = get_category(app)
+            low_activity_apps = ["Desktop", "Browser", "File Explorer", "Terminal", "Unknown", ""]
+            
             if category == 'productive':
                 status = "Focused"
-            elif category == 'dopamine' or switches > 3:
-                status = "Doomscrolling" if category == 'dopamine' else "Distracted"
+            elif category == 'dopamine':
+                status = "Doomscrolling" if typing_speed < 10 else "Distracted"
+            elif switches > 3:
+                status = "Distracted"
+            elif typing_speed < 5 and app not in low_activity_apps:
+                status = "Doomscrolling"
             else:
                 status = "Neutral"
                 

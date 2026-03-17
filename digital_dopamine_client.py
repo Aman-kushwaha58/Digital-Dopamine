@@ -35,6 +35,9 @@ class ActivityClient:
             if "youtube" in window_title: return "YouTube"
             if "instagram" in window_title: return "Instagram"
             if "whatsapp" in window_title: return "WhatsApp"
+            if "vlc" in process_name.lower(): return "VLC Media Player"
+            if "chrome" in process_name.lower(): return "Google Chrome"
+            if "msedge" in process_name.lower(): return "Microsoft Edge"
             if "code" in process_name.lower(): return "VS Code"
             
             return process_name
