@@ -5,6 +5,9 @@ class UserActivity(models.Model):
     active_app = models.CharField(max_length=255)
     typing_speed = models.IntegerField(default=0)
     app_switch_count = models.IntegerField(default=0)
+    scroll_count = models.IntegerField(default=0)
+    click_count = models.IntegerField(default=0)
+    active_time = models.IntegerField(default=0)
     dopamine_score = models.IntegerField(default=0)
 
     STATUS_CHOICES = [

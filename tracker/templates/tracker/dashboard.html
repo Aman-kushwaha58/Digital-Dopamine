@@ -491,7 +491,7 @@
                         <td style="font-family: monospace;">${a.timestamp}</td>
                         <td style="font-weight: 600;">${a.app}</td>
                         <td><span style="opacity: 0.7; font-size: 11px;">${a.category}</span></td>
-                        <td>${a.typing_speed} <small>KPM</small></td>
+                        <td>${a.typing_speed || a.click_count || 0} <small>KPM</small></td>
                         <td>${a.app_switches}</td>
                         <td><strong style="color: ${a.dopamine_score > 50 ? 'var(--danger)' : 'var(--success)'}">${a.dopamine_score}</strong></td>
                         <td><span class="status-pill status-${statusClass}">${a.status}</span></td>
@@ -502,6 +502,41 @@
 
         fetchData();
         setInterval(fetchData, 7000);
+
+        // --- UNIVERSAL TRACKER (STEP 2) ---
+        let startTime = Date.now();
+        let scrollCount = 0;
+        let clicks = 0;
+        let activeTime = 0;
+        let tabSwitches = 0;
+
+        document.addEventListener("click", () => { clicks++; });
+        window.addEventListener("scroll", () => { scrollCount++; });
+        
+        setInterval(() => {
+            if (!document.hidden) { activeTime++; }
+        }, 1000);
+
+        window.addEventListener("blur", () => { tabSwitches++; });
+
+        // --- Send DATA to backend (STEP 3) ---
+        setInterval(() => {
+            fetch("/api/data/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "X-CSRFToken": getCSRFToken()
+                },
+                body: JSON.stringify({
+                    timeSpent: Math.floor((Date.now() - startTime)/1000),
+                    scroll: scrollCount,
+                    clicks: clicks,
+                    tabSwitches: tabSwitches,
+                    activeTime: activeTime,
+                    timestamp: new Date()
+                })
+            });
+        }, 10000);
     </script>
 </body>
 </html>

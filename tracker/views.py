@@ -46,6 +46,9 @@ def get_recent_activity(request):
                 'category': get_category(activity.active_app),
                 'typing_speed': activity.typing_speed,
                 'app_switches': activity.app_switch_count,
+                'scroll_count': activity.scroll_count,
+                'click_count': activity.click_count,
+                'active_time': activity.active_time,
                 'dopamine_score': activity.dopamine_score,
                 'status': activity.status
             }
@@ -372,7 +375,7 @@ def report_activity(request):
             
             # Server-side re-categorization for better accuracy
             category = get_category(app)
-            low_activity_apps = ["Desktop", "Browser", "File Explorer", "Terminal", "Unknown", ""]
+            low_activity_apps = ["Desktop", "Browser", "File Explorer", "Terminal", "PWA Dash (Mobile)", "PWA Dash (Laptop)", "Unknown", ""]
             
             if category == 'productive':
                 status = "Focused"
@@ -396,6 +399,40 @@ def report_activity(request):
                 app_switch_count=switches,
                 dopamine_score=score,
                 status=status
+            )
+            activity.save()
+            return JsonResponse({'status': 'success'})
+        except Exception as e:
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+    return JsonResponse({'status': 'error', 'message': 'Only POST allowed'}, status=405)
+@csrf_exempt
+def api_data_receive(request):
+    """API endpoint for Universal Tracker to submit data"""
+    if request.method == 'POST':
+        import json
+        try:
+            data = json.loads(request.body)
+            clicks = data.get('clicks', 0)
+            scrolls = data.get('scroll', 0)
+            switches = data.get('tabSwitches', 0)
+            
+            # Map PWA Dashboard activity to existing fields for UI consistency
+            # Simulated typing: clicks are high intent, scrolls are low intent
+            simulated_typing = int(clicks * 2 + scrolls * 0.1)
+            
+            # Simulated dopamine score
+            raw_score = float(simulated_typing * 0.5 + switches * 5)
+            score = int(min(100.0, raw_score))
+            
+            activity = UserActivity(
+                active_app="PWA Dashboard",
+                scroll_count=scrolls,
+                click_count=clicks,
+                typing_speed=simulated_typing,
+                app_switch_count=switches,
+                active_time=data.get('activeTime', 0),
+                dopamine_score=score,
+                status="Neutral"
             )
             activity.save()
             return JsonResponse({'status': 'success'})
